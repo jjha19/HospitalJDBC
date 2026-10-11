@@ -4,6 +4,8 @@ import domain.DTOs.CredentialDTO;
 import domain.DTOs.MedRecordDTO;
 import domain.DTOs.PatientDTO;
 import domain.exceptions.AppError;
+import domain.exceptions.DatabaseError;
+import domain.exceptions.ForeignKeyError;
 import jakarta.enterprise.inject.se.SeContainer;
 import jakarta.enterprise.inject.se.SeContainerInitializer;
 
@@ -38,7 +40,11 @@ public class MainMenu {
                 CredentialDTO credentialDTO = new CredentialDTO();
                 credentialDTO.setUsername(username);
                 credentialDTO.setPassword(password);
-                loggedIn = credentialUI.login(credentialDTO);
+                try {
+                    loggedIn = credentialUI.login(credentialDTO);
+                } catch (DatabaseError e) {
+                    System.out.println("Process canceled - " + e.getMessage());
+                }
                 if (!loggedIn) {
                     System.out.println("Invalid username or password. Please try again.");
                 }
@@ -49,7 +55,7 @@ public class MainMenu {
                 System.out.println("""
                         Main Menu
                         1. Get all Patients
-                        2. Add PatientEntity
+                        2. Add Patient
                         3. Update Patient
                         4. Delete Patient
                         5. Get all Doctors
@@ -67,8 +73,8 @@ public class MainMenu {
                         try {
                             System.out.println("Get all Patients");
                             patientUi.getAll().forEach(p -> System.out.println("  -> " + p));
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                        } catch (DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 2:
@@ -92,11 +98,11 @@ public class MainMenu {
                             System.out.println("What's the patient's password?");
                             String patientPassword = sc.nextLine();
 
-                            PatientDTO patientDTO = new PatientDTO(0, patientName, birthDate, patientPhoneNumber, 0,patientUsername , patientPassword);
+                            PatientDTO patientDTO = new PatientDTO(0, patientName, birthDate, patientPhoneNumber, 0, patientUsername, patientPassword);
 
                             System.out.println("Adding patient with the ID: " + patientUi.save(patientDTO));
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                        } catch (DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 3:
@@ -124,10 +130,8 @@ public class MainMenu {
                             PatientDTO patient = new PatientDTO(id, name, birthDate, phoneNumber, 0, username, password);
                             System.out.println("Updating patient with the ID: " + id);
                             patientUi.update(patient);
-                        } catch (Exception e) {
-                            System.err.println("Error updating patient: " + e.getMessage());
-                            e.printStackTrace();
-                            throw new RuntimeException(e);
+                        } catch (ForeignKeyError | DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 4:
@@ -138,15 +142,17 @@ public class MainMenu {
                             sc.nextLine();
                             System.out.println("Deleting patient with the ID: " + idPatient);
                             patientUi.delete(idPatient);
-                        } catch (Exception e) {
-                            System.err.println("Error deleting patient: " + e.getMessage());
-                            e.printStackTrace();
-                            throw new RuntimeException(e);
+                        } catch (ForeignKeyError | DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 5:
                         System.out.println("Get all Doctors");
-                        doctorUi.getAll().forEach(p -> System.out.println("  -> " + p));
+                        try {
+                            doctorUi.getAll().forEach(p -> System.out.println("  -> " + p));
+                        } catch (DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
+                        }
                         break;
                     case 6:
                         try {
@@ -155,13 +161,12 @@ public class MainMenu {
                             int patientId = sc.nextInt();
                             sc.nextLine();
                             medRecordUi.getMedRecordByPatientId(patientId).forEach(medRecord -> System.out.println("  -> " + medRecord));
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                        } catch (DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 7:
                         System.out.println("Add MedRecords");
-                        // TODO: add medical records and medications at the same time
                         try {
                             System.out.println("Enter the patient id to add the medical record:");
                             int patientId = sc.nextInt();
@@ -173,13 +178,19 @@ public class MainMenu {
                             String diagnosis = sc.nextLine();
                             System.out.println("Enter the admission date YYYY-MM-DD");
                             String admissionDate = sc.nextLine();
+                            try {
+                                LocalDate.parse(admissionDate); // Validate the date format
+                            } catch (DateTimeParseException e) {
+                                System.out.println("Invalid date format. Using default value 2000-01-01.");
+                                admissionDate = "2000-01-01";
+                            }
                             System.out.println("Enter the medications prescribed separated by a comma");
                             String answer = sc.nextLine();
                             List<String> medications = new ArrayList<>(Arrays.stream(answer.split(",")).toList());
                             MedRecordDTO medRecordDTO = new MedRecordDTO(0, diagnosis, admissionDate, patientId, doctorId, medications);
                             medRecordUi.save(medRecordDTO);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                        } catch (ForeignKeyError | DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 8:
@@ -191,7 +202,13 @@ public class MainMenu {
                             System.out.println("Enter the new medical record description:");
                             String description = sc.nextLine();
                             System.out.println("Enter the new medical record date (yyyy-mm-dd):");
-                            String date = sc.nextLine();
+                            String dateInput = sc.nextLine();
+                            try {
+                                LocalDate.parse(dateInput); // Validate the date format
+                            } catch (DateTimeParseException e) {
+                                System.out.println("Invalid date format. Using default value 2000-01-01.");
+                                dateInput = "2000-01-01";
+                            }
                             System.out.println("Enter the new patient ID:");
                             int idPatient = sc.nextInt();
                             sc.nextLine();
@@ -201,19 +218,23 @@ public class MainMenu {
                             System.out.println("Enter the new medications (comma-separated):");
                             String medicationsStr = sc.nextLine();
                             java.util.List<String> medications = java.util.Arrays.asList(medicationsStr.split(","));
-                            MedRecordDTO medRecordDTO = new MedRecordDTO(idrecord, description, date, idPatient, idDoctor, medications);
+                            MedRecordDTO medRecordDTO = new MedRecordDTO(idrecord, description, dateInput, idPatient, idDoctor, medications);
                             medRecordUi.update(medRecordDTO);
-                        } catch (Exception e) {
-                            System.err.println("Error updating medical record: " + e.getMessage());
-                            e.printStackTrace();
-                            throw new RuntimeException(e);
+                        } catch (DatabaseError e) {
+                            System.out.println("Process canceled - " + e.getMessage());
                         }
                         break;
                     case 9:
-                        System.out.println("Delete MedRecords");
-
-                        //TODO: Delete all medications and then medrecords no questions asked
-                        medRecordUi.delete();
+                        try {
+                            System.out.println("Delete MedRecords");
+                            System.out.println("Enter the medical record ID to delete:");
+                            int idrecord = sc.nextInt();
+                            medRecordUi.delete(idrecord);
+                        } catch (ForeignKeyError | DatabaseError e ) {
+                            System.out.println("Process canceled - " + e.getMessage());
+                        }catch (Exception e) {
+                            System.out.println("An unexpected error occurred: " + e.getMessage());
+                        }
                         break;
                     case 10:
                         System.out.println("Exiting...");

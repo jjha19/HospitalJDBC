@@ -71,8 +71,8 @@ public class JDBCPatientRepository implements dao.interfaces.PatientRepository {
                 con.rollback();
                 throw new DuplicateUsernameError(Constants.DUPLICATE_USERNAME);
             } catch (SQLException e) {
-                Logger.getLogger(JDBCPatientRepository.class.getName()).log(Level.SEVERE, null, e);
                 con.rollback();
+                Logger.getLogger(JDBCPatientRepository.class.getName()).log(Level.SEVERE, null, e);
             } finally {
                 con.setAutoCommit(true);
             }
@@ -103,27 +103,34 @@ public class JDBCPatientRepository implements dao.interfaces.PatientRepository {
             con.setAutoCommit(false);
             // If i dont confirm i dont execute this yet
             if (confirmation) {
-                try (PreparedStatement statement = con.prepareStatement(SQLQueries.DELETE_MEDICAL_RECORDS);
-                     PreparedStatement statement3 = con.prepareStatement(SQLQueries.DELETE_PATIENT_PAYMENTS);
-                     PreparedStatement statement4 = con.prepareStatement(SQLQueries.DELETE_PATIENT_APPOINTMENTS);
-                     PreparedStatement statement5 = con.prepareStatement(SQLQueries.DELETE_PRESCRIBED_MEDICATIONS_BY_PATIENTID)) {
+                try (PreparedStatement delMedRecord = con.prepareStatement(SQLQueries.DELETE_MEDICAL_RECORD_BY_PATIENTID);
+                     PreparedStatement delPatPayment = con.prepareStatement(SQLQueries.DELETE_PATIENT_PAYMENTS_BY_PATIENTID);
+                     PreparedStatement delPatAppt = con.prepareStatement(SQLQueries.DELETE_PATIENT_APPOINTMENTS_BY_PATIENTID);
+                     PreparedStatement delPresMed = con.prepareStatement(SQLQueries.DELETE_PRESCRIBED_MEDICATIONS_BY_PATIENTID)) {
 
 
-                    statement.setInt(1, id);
-                    statement3.setInt(1, id);
-                    statement4.setInt(1, id);
-                    statement5.setInt(1, id);
+                    delMedRecord.setInt(1, id);
+                    delPatPayment.setInt(1, id);
+                    delPatAppt.setInt(1, id);
+                    delPresMed.setInt(1, id);
 
-                    statement.executeUpdate();
-                    statement3.executeUpdate();
-                    statement4.executeUpdate();
-                    statement5.executeUpdate();
+                    delPatAppt.executeUpdate();
+                    delPresMed.executeUpdate();
+                    delPatPayment.executeUpdate();
+                    delMedRecord.executeUpdate();
+                }catch (SQLIntegrityConstraintViolationException ex) {
+                    con.rollback();
+                    throw new ForeignKeyError(Constants.FOREIGN_KEY_ERROR);
+                } catch (SQLException e) {
+                    con.rollback();
+                    Logger.getLogger(JDBCPatientRepository.class.getName()).log(Level.SEVERE, null, e);
                 }
             }
             //Executed by default
             try (PreparedStatement statement = con.prepareStatement(SQLQueries.DELETE_PATIENT);
                  PreparedStatement statement2 = con.prepareStatement(SQLQueries.DELETE_CREDENTIAL_BY_PATIENT_ID);
             ) {
+
 
                 statement.setInt(1, id);
                 statement2.setInt(1, id);

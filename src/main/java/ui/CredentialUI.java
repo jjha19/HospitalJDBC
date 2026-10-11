@@ -1,6 +1,7 @@
 package ui;
 
 import domain.DTOs.CredentialDTO;
+import domain.exceptions.DatabaseError;
 import domain.service.CredentialService;
 import jakarta.inject.Inject;
 
@@ -13,7 +14,11 @@ public class CredentialUI {
     }
 
     public boolean login(CredentialDTO credentialDTO) {
-        return credentialService.getByUsername(credentialDTO);
+        try {
+            return credentialService.getByUsername(credentialDTO);
+        }catch (DatabaseError e){
+            throw new DatabaseError(e.getMessage());
+        }
     }
 
 }

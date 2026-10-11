@@ -3,6 +3,8 @@ package domain.service;
 import dao.repository.JDBC.JDBCMedRecordRepository;
 import dao.model.MedRecordEntity;
 import domain.DTOs.MedRecordDTO;
+import domain.exceptions.DatabaseError;
+import domain.exceptions.ForeignKeyError;
 import domain.mappers.MedicalRecordDTOMapper;
 import jakarta.inject.Inject;
 
@@ -17,18 +19,36 @@ public class MedRecordService {
     }
 
     public List<MedRecordDTO> getMedRecordByPatientId(int patientId) {
-        return jdbcMedRecordRepository.getMedRecordByPatientId(patientId).stream().map(MedicalRecordDTOMapper::toDto).toList();
+        try {
+            return jdbcMedRecordRepository.getMedRecordByPatientId(patientId).stream().map(MedicalRecordDTOMapper::toDto).toList();
+        }catch (DatabaseError e){
+            throw new DatabaseError(e.getMessage());
+        }
     }
 
     public int save(MedRecordDTO medRecordDTO) {
-        return jdbcMedRecordRepository.save(MedicalRecordDTOMapper.toEntity(medRecordDTO));
+        try {
+            return jdbcMedRecordRepository.save(MedicalRecordDTOMapper.toEntity(medRecordDTO));
+        } catch (ForeignKeyError e) {
+            throw new ForeignKeyError(e.getMessage());
+        }catch (DatabaseError e){
+            throw new DatabaseError(e.getMessage());
+        }
     }
 
     public void update(MedRecordDTO medRecordDTO) {
-        jdbcMedRecordRepository.update(MedicalRecordDTOMapper.toEntity(medRecordDTO));
+        try {
+            jdbcMedRecordRepository.update(MedicalRecordDTOMapper.toEntity(medRecordDTO));
+        }catch (DatabaseError e){
+            throw new DatabaseError(e.getMessage());
+        }
     }
 
     public void delete(int id) {
-        jdbcMedRecordRepository.delete(id);
+        try {
+            jdbcMedRecordRepository.delete(id);
+        }catch (DatabaseError e){
+            throw new DatabaseError(e.getMessage());
+        }
     }
 }

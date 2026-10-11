@@ -4,6 +4,7 @@ import dao.mappers.CredentialRowMapper;
 import dao.model.CredentialEntity;
 import dao.repository.common.SQLQueries;
 import domain.exceptions.DatabaseError;
+import domain.exceptions.NoUserFound;
 import jakarta.inject.Inject;
 
 import java.sql.Connection;
@@ -28,13 +29,14 @@ public class JDBCCredentialRepository {
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
                 return credentialRowMapper.mapRow(resultSet);
+            }else {
+                throw new NoUserFound("No user found with username: " + username);
             }
         } catch (DatabaseError e) {
-            Logger.getLogger(JDBCCredentialRepository.class.getName()).severe("Error fetching credential by username: " + e.getMessage());
-        } catch (SQLException ex) {
-            Logger.getLogger(JDBCCredentialRepository.class.getName()).severe("SQL Error fetching credential by username: " + ex.getMessage());
+            throw new NoUserFound("Error fetching user by username: " + e.getMessage());
+        } catch (SQLException e) {
+            throw new DatabaseError("Database error occurred while fetching user by username: " + e.getMessage());
         }
-        return null;
     }
 
 }

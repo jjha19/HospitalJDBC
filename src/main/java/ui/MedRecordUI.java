@@ -1,6 +1,8 @@
 package ui;
 
 import domain.DTOs.MedRecordDTO;
+import domain.exceptions.DatabaseError;
+import domain.exceptions.ForeignKeyError;
 import domain.service.MedRecordService;
 import jakarta.inject.Inject;
 
@@ -20,18 +22,28 @@ public class MedRecordUI {
     }
 
     public int save(MedRecordDTO medRecordDTO) {
-        return medRecordService.save(medRecordDTO);
+        try {
+            return medRecordService.save(medRecordDTO);
+        } catch (ForeignKeyError e) {
+            throw new ForeignKeyError(e.getMessage());
+        }catch (DatabaseError e){
+            throw new DatabaseError(e.getMessage());
+        }
     }
 
     public void update(MedRecordDTO medRecordDTO) {
-        medRecordService.update(medRecordDTO);
+        try {
+            medRecordService.update(medRecordDTO);
+        } catch (DatabaseError e) {
+            throw new DatabaseError(e.getMessage());
+        }
     }
 
-    public void delete() {
-        System.out.println("Enter the medical record ID to delete:");
-        java.util.Scanner sc = new java.util.Scanner(System.in);
-        int id = sc.nextInt();
-        sc.nextLine(); // Consume the enter
-        medRecordService.delete(id);
+    public void delete(int id) {
+        try {
+            medRecordService.delete(id);
+        }catch (DatabaseError e) {
+            throw new DatabaseError(e.getMessage());
+        }
     }
 }

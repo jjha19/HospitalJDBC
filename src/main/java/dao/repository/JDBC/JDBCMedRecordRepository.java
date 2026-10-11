@@ -24,8 +24,10 @@ public class JDBCMedRecordRepository {
     public List<MedRecordEntity> getMedRecordByPatientId(int patientId) {
         List<MedRecordEntity> medRecords = new ArrayList<>();
         try (Connection con = connection.getConnection()) {
-            try (Statement st = con.createStatement()) {
-                ResultSet rs = st.executeQuery(SQLQueries.SELECT_MEDICAL_RECORDS_BY_PATIENT_ID);
+            try (PreparedStatement st = con.prepareStatement(SQLQueries.SELECT_MEDICAL_RECORDS_BY_PATIENT_ID)) {
+                st.setInt(1, patientId);
+                ResultSet rs = st.executeQuery();
+
                 while (rs.next()) {
                     MedRecordEntity medRecord = rowMapper.mapRow(rs);
                     medRecords.add(medRecord);
@@ -33,7 +35,7 @@ public class JDBCMedRecordRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DatabaseError(e.getMessage());
         }
         return medRecords;
 
@@ -42,23 +44,27 @@ public class JDBCMedRecordRepository {
     public int save(MedRecordEntity medRecordEntity) {
         try (Connection con = connection.getConnection()) {
             int medrecordID = 0;
-            try (PreparedStatement st = con.prepareStatement(SQLQueries.INSERT_MEDICATIONS, Statement.RETURN_GENERATED_KEYS);
-                 PreparedStatement st2 = con.prepareStatement(SQLQueries.INSERT_MEDRECORD, Statement.RETURN_GENERATED_KEYS)) {
+            try (PreparedStatement insert_record = con.prepareStatement(SQLQueries.INSERT_MEDRECORD, Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement insert_med = con.prepareStatement(SQLQueries.INSERT_MEDICATIONS, Statement.RETURN_GENERATED_KEYS);
                 con.setAutoCommit(false);
 
-                st.setInt(1, medRecordEntity.getRecordId());
-                st.setString(2, medRecordEntity.getMedications().toString());
+                insert_record.setInt(1, medRecordEntity.getPatientId());
+                insert_record.setInt(2, medRecordEntity.getDoctorId());
+                insert_record.setString(3, medRecordEntity.getDiagnosis());
+                insert_record.setString(4, medRecordEntity.getAdmissionDate());
 
-                st2.setInt(1, medRecordEntity.getPatientId());
-                st2.setInt(2, medRecordEntity.getDoctorId());
-                st2.setString(3, medRecordEntity.getDiagnosis());
-                st.setString(4, medRecordEntity.getAdmissionDate());
+                if (insert_record.executeUpdate() == 1) {
+                    ResultSet rs = insert_record.getGeneratedKeys();
+                    if (rs.next()){
+                        medrecordID = rs.getInt(1);
+                    }
+                }else throw new DatabaseError("Failed to retrieve generated record ID");
 
-                st.executeUpdate();
-                if (st2.executeUpdate() == 1) {
-                    ResultSet rs = st.getGeneratedKeys();
-                    if (rs.next()) medrecordID = rs.getInt(1);
-                }
+                insert_med.setInt(1, medrecordID);
+                insert_med.setString(2, medRecordEntity.getMedications().toString());
+
+
+                insert_med.executeUpdate();
 
                 con.commit();
             } catch (SQLIntegrityConstraintViolationException e) {
@@ -78,11 +84,30 @@ public class JDBCMedRecordRepository {
     }
 
     public void update(MedRecordEntity medRecordEntity) {
-        try (Connection con = connection.getConnection()){
-            try (PreparedStatement st = con.prepareStatement(SQLQueries.UPDATE_MEDRECORDS)) {
+        try (Connection con = connection.getConnection()) {
+            try (PreparedStatement st = con.prepareStatement(SQLQueries.UPDATE_MEDRECORDS);
+                 PreparedStatement st2 = con.prepareStatement(SQLQueries.UPDATE_PRESCRIBED_MEDICATIONS)) {
                 con.setAutoCommit(false);
+                st.setInt(1, medRecordEntity.getPatientId());
+                st.setInt(2, medRecordEntity.getDoctorId());
+                st.setString(3, medRecordEntity.getDiagnosis());
+                st.setString(4, medRecordEntity.getAdmissionDate());
+                st.setInt(5, medRecordEntity.getRecordId());
+
+                st2.setString(1, medRecordEntity.getMedications().toString());
+                st2.setInt(2, medRecordEntity.getRecordId());
+
+                st2.executeUpdate();
+                st.executeUpdate();
 
                 con.commit();
+            } catch (SQLIntegrityConstraintViolationException e) {
+                con.rollback();
+                throw new ForeignKeyError(e.getMessage());
+            } catch (SQLException e) {
+                con.rollback();
+                throw new DatabaseError(e.getMessage());
+
             }finally {
                 con.setAutoCommit(true);
             }
@@ -93,8 +118,8 @@ public class JDBCMedRecordRepository {
 
     public void delete(int id) {
         try (Connection con = connection.getConnection()) {
-            try (PreparedStatement st = con.prepareStatement(SQLQueries.DELETE_PRESCRIBED_MEDICATIONS_BY_PATIENTID);
-                 PreparedStatement st2 = con.prepareStatement(SQLQueries.DELETE_MEDICAL_RECORDS);) {
+            try (PreparedStatement st = con.prepareStatement(SQLQueries.DELETE_PRESCRIBED_MEDICATIONS_BY_RECORDID);
+                 PreparedStatement st2 = con.prepareStatement(SQLQueries.DELETE_MEDICAL_RECORDS_BY_RECORDID);) {
                 con.setAutoCommit(false);
 
                 st.setInt(1, id);
@@ -103,10 +128,10 @@ public class JDBCMedRecordRepository {
                 st.executeUpdate();
                 st2.executeUpdate();
                 con.commit();
-            } catch (SQLIntegrityConstraintViolationException e){
+            } catch (SQLIntegrityConstraintViolationException e) {
                 con.rollback();
                 throw new ForeignKeyError(e.getMessage());
-            }finally {
+            } finally {
                 con.setAutoCommit(true);
             }
         } catch (SQLException e) {
